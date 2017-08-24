@@ -27,6 +27,7 @@ contract StandardToken {
     /* init an array with balances */
     mapping (address => uint256) balances;
     mapping (address => mapping (address => uint256)) allowed;
+    mapping (address => bool) public blacklisted;
     
     /* events */
     event Transfer(address indexed _from, address indexed _to, uint256 _value);
@@ -78,7 +79,6 @@ contract RCToken is StandardToken, CarefulOperation {
     string public constant symbol = "RCT";
     uint256 public constant decimals = 18;
     uint256 public icoSupplied = 0;
-    //uint256 public fundationSupply;
     string public version = "1.0";
 
     address public ethFundDeposit;
@@ -89,6 +89,7 @@ contract RCToken is StandardToken, CarefulOperation {
     uint256 public fundingEndBlock;
     uint256 public constant rctFund = 0.3 * 420 * (10**6) * 10**decimals;
     uint256 public constant icoCap =  0.4 * 420 * (10**6) * 10**decimals;
+    uint256 public tokenLeft;
 
     /* events */
     event CreateRCT(address indexed _to, uint256 _value);
@@ -105,7 +106,6 @@ contract RCToken is StandardToken, CarefulOperation {
         rctFundDeposit = _rctFundDeposit;
         fundingStartBlock = _fundingStartBlock;
         fundingEndBlock = _fundingEndBlock;
-        //fundationSupply = rctFund;
         balances[rctFundDeposit] = rctFund;
         CreateRCT(rctFundDeposit, rctFund);
     }
@@ -121,9 +121,15 @@ contract RCToken is StandardToken, CarefulOperation {
         require (block.number >= fundingStartBlock);
         require (block.number <= fundingEndBlock);
         require (msg.value != 0);
+        
+        if (block.number>=fundingStartBlock && block.number<fundingStartBlock+100) {
+            require (!blacklisted[msg.sender]);
+        }
+        
 
         uint256 tokens = checkMultiply(msg.value, tokenRate());
         uint256 tokenOffered = checkAdd(icoSupplied, tokens);
+        tokenLeft = checkSubtract(icoCap, tokenOffered);
 
         require (icoCap >= tokenOffered);
 
@@ -134,6 +140,9 @@ contract RCToken is StandardToken, CarefulOperation {
 
     function() payable {
         makeTokens();
+        if (block.number>=fundingStartBlock && block.number<fundingStartBlock+100) {
+            blacklisted[msg.sender] = true; 
+        }
     }
 
     function finalize() external {
@@ -143,5 +152,6 @@ contract RCToken is StandardToken, CarefulOperation {
 
         isFinished = true;
         require(ethFundDeposit.send(this.balance));
+        balances[rctFundDeposit] += tokenLeft;
     }
 }
