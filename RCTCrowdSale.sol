@@ -78,17 +78,18 @@ contract RCToken is StandardToken, CarefulOperation {
     string public constant symbol = "RCT";
     uint256 public constant decimals = 18;
     uint256 public icoSupplied = 0;
-    //uint256 public fundationSupply;
     string public version = "1.0";
 
     address public ethFundDeposit;
     address public rctFundDeposit;
 
     bool public isFinished;
+    uint256 public constant blocksperDay =  4320; // avg time = 20s/block, 1 day -> 4320 blocks
     uint256 public fundingStartBlock;
     uint256 public fundingEndBlock;
-    uint256 public constant rctFund = 0.3 * 420 * (10**6) * 10**decimals;
-    uint256 public constant icoCap =  0.4 * 420 * (10**6) * 10**decimals;
+    uint256 public constant rctFund = (0.3 + 0.064) * 420 * (10**6) * 10**decimals  ;
+    uint256 public constant icoCap =  (0.4 - 0.064) * 420 * (10**6) * 10**decimals  ;
+    uint256 public tokenLeft;
 
     /* events */
     event CreateRCT(address indexed _to, uint256 _value);
@@ -105,15 +106,13 @@ contract RCToken is StandardToken, CarefulOperation {
         rctFundDeposit = _rctFundDeposit;
         fundingStartBlock = _fundingStartBlock;
         fundingEndBlock = _fundingEndBlock;
-        //fundationSupply = rctFund;
         balances[rctFundDeposit] = rctFund;
         CreateRCT(rctFundDeposit, rctFund);
     }
 
     function tokenRate() constant returns(uint) {
-        if (block.number>=fundingStartBlock && block.number<fundingStartBlock+100) return 200; // evern early
-        if (block.number>=fundingStartBlock && block.number<fundingStartBlock+200) return 170; // early bird
-        return 130;                                                                            // regular
+        if (block.number>=fundingStartBlock && block.number<fundingStartBlock+(7*blocksperDay)) return 7392; // early bird
+        return 6720;  // ico, regular
     }
 
     function makeTokens() payable  {
@@ -124,6 +123,7 @@ contract RCToken is StandardToken, CarefulOperation {
 
         uint256 tokens = checkMultiply(msg.value, tokenRate());
         uint256 tokenOffered = checkAdd(icoSupplied, tokens);
+        tokenLeft = checkSubtract(icoCap, tokenOffered);
 
         require (icoCap >= tokenOffered);
 
@@ -143,5 +143,6 @@ contract RCToken is StandardToken, CarefulOperation {
 
         isFinished = true;
         require(ethFundDeposit.send(this.balance));
+        balances[rctFundDeposit] += tokenLeft;
     }
 }
