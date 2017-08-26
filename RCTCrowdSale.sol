@@ -27,7 +27,6 @@ contract StandardToken {
     /* init an array with balances */
     mapping (address => uint256) balances;
     mapping (address => mapping (address => uint256)) allowed;
-    mapping (address => bool) public blacklisted;
     
     /* events */
     event Transfer(address indexed _from, address indexed _to, uint256 _value);
@@ -85,10 +84,11 @@ contract RCToken is StandardToken, CarefulOperation {
     address public rctFundDeposit;
 
     bool public isFinished;
+    uint256 public constant blocksperDay =  4320; // avg time = 20s/block, 1 day -> 4320 blocks
     uint256 public fundingStartBlock;
     uint256 public fundingEndBlock;
-    uint256 public constant rctFund = 0.3 * 420 * (10**6) * 10**decimals;
-    uint256 public constant icoCap =  0.4 * 420 * (10**6) * 10**decimals;
+    uint256 public constant rctFund = (0.3 + 0.064) * 420 * (10**6) * 10**decimals  ;
+    uint256 public constant icoCap =  (0.4 - 0.064) * 420 * (10**6) * 10**decimals  ;
     uint256 public tokenLeft;
 
     /* events */
@@ -111,9 +111,8 @@ contract RCToken is StandardToken, CarefulOperation {
     }
 
     function tokenRate() constant returns(uint) {
-        if (block.number>=fundingStartBlock && block.number<fundingStartBlock+100) return 200; // evern early
-        if (block.number>=fundingStartBlock && block.number<fundingStartBlock+200) return 170; // early bird
-        return 130;                                                                            // regular
+        if (block.number>=fundingStartBlock && block.number<fundingStartBlock+(7*blocksperDay)) return 7392; // early bird
+        return 6720;  // ico, regular
     }
 
     function makeTokens() payable  {
@@ -121,11 +120,6 @@ contract RCToken is StandardToken, CarefulOperation {
         require (block.number >= fundingStartBlock);
         require (block.number <= fundingEndBlock);
         require (msg.value != 0);
-        
-        if (block.number>=fundingStartBlock && block.number<fundingStartBlock+100) {
-            require (!blacklisted[msg.sender]);
-        }
-        
 
         uint256 tokens = checkMultiply(msg.value, tokenRate());
         uint256 tokenOffered = checkAdd(icoSupplied, tokens);
@@ -140,9 +134,6 @@ contract RCToken is StandardToken, CarefulOperation {
 
     function() payable {
         makeTokens();
-        if (block.number>=fundingStartBlock && block.number<fundingStartBlock+100) {
-            blacklisted[msg.sender] = true; 
-        }
     }
 
     function finalize() external {
